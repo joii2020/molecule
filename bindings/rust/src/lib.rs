@@ -19,6 +19,7 @@ cfg_if::cfg_if! {
 
 pub use bytes;
 pub mod error;
+pub mod lazy_reader;
 pub mod prelude;
 mod primitive;
 
