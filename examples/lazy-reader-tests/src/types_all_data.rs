@@ -275,6 +275,8 @@ impl TypesAll {
 
         let cursor = Cursor::new(data.len(), Box::new(data.to_vec()));
         let all_in_one = AllInOne { cursor };
+        all_in_one.verify(true)?;
+        all_in_one.verify(false)?;
 
         self.f0
             .check(&all_in_one.f0()?)

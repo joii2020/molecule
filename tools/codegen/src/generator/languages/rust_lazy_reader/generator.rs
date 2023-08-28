@@ -48,10 +48,32 @@ impl LazyReaderGenerator for ast::Union {
             };
             writeln!(output, "{}", q)?;
         }
+
+        let verify_items = self.items().iter().enumerate().map(|(_i, item)| {
+            let item_id = item.id();
+            let item_type_name = item.typ().name();
+            let item_type_name = ident_new(&format!("as_{}", item_type_name.to_snake()));
+
+            let typ = item.typ().as_ref();
+
+            let func = verify_typ(typ, quote!(self.#item_type_name()?));
+            quote!(
+                #item_id => {
+                    #func;
+                    Ok(())
+                }
+            )
+        });
+
         let q = quote! {
             impl #name {
-                pub fn verify(&self, _compatible: bool) -> Result<(), Error> {
-                    Ok(())
+                pub fn verify(&self, compatible: bool) -> Result<(), Error> {
+                    match self.item_id()? {
+                        #( #verify_items )*
+                        _ => {
+                            Ok(())
+                        }
+                    }
                 }
             }
         };
@@ -74,10 +96,27 @@ impl LazyReaderGenerator for ast::Array {
         )?;
         let total_size = self.item_count() * self.item_size();
         let name = ident_new(self.name());
+
+        let verify_sub = if has_verify(self.item().typ()) {
+            let func = verify_typ(self.item().typ().as_ref(), quote!(self.get(i)?));
+            quote!(for i in 0..self.len() {
+                #func
+            })
+        } else {
+            quote!()
+        };
+
+        let val_compatible = if verify_sub.is_empty() {
+            quote!(_compatible)
+        } else {
+            quote!(compatible)
+        };
         let q = quote! {
             impl #name {
-                pub fn verify(&self, _compatible: bool) -> Result<(), Error> {
-                    self.cursor.verify_fixed_size(#total_size)
+                pub fn verify(&self, #val_compatible: bool) -> Result<(), Error> {
+                    self.cursor.verify_fixed_size(#total_size)?;
+                    #verify_sub;
+                    Ok(())
                 }
             }
         };
@@ -92,10 +131,19 @@ impl LazyReaderGenerator for ast::Struct {
         generate_rust_common_table(output, self.name(), self.fields(), Some(self.field_sizes()))?;
         let name = ident_new(self.name());
         let total_size: usize = self.field_sizes().iter().sum();
+
+        let verify_fields = self
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(_i, f)| verify_filed(f));
+
         let q = quote! {
             impl #name {
-                pub fn verify(&self, _compatible: bool) -> Result<(), Error> {
-                    self.cursor.verify_fixed_size(#total_size)
+                pub fn verify(&self, compatible: bool) -> Result<(), Error> {
+                    self.cursor.verify_fixed_size(#total_size)?;
+                    #( #verify_fields )*
+                    Ok(())
                 }
             }
         };
@@ -117,12 +165,30 @@ impl LazyReaderGenerator for ast::FixVec {
             Some(self),
             None,
         )?;
+
+        let verify_sub = if has_verify(self.item().typ()) {
+            let func = verify_typ(self.item().typ().as_ref(), quote!(self.get(i)?));
+            quote!(for i in 0..self.len()? {
+                #func
+            })
+        } else {
+            quote!()
+        };
+        let val_compatible = if verify_sub.is_empty() {
+            quote!(_compatible)
+        } else {
+            quote!(compatible)
+        };
+
         let name = ident_new(self.name());
         let item_size = self.item_size();
+
         let q = quote! {
             impl #name {
-                pub fn verify(&self, _compatible: bool) -> Result<(), Error> {
-                    self.cursor.verify_fixvec(#item_size)
+                pub fn verify(&self, #val_compatible: bool) -> Result<(), Error> {
+                    self.cursor.verify_fixvec(#item_size)?;
+                    #verify_sub;
+                    Ok(())
                 }
             }
         };
@@ -143,11 +209,32 @@ impl LazyReaderGenerator for ast::DynVec {
             None,
             Some(self),
         )?;
+
+        let verify_sub = if has_verify(self.item().typ()) {
+            let func = verify_typ(self.item().typ().as_ref(), quote!(self.get(i)?));
+            if func.is_empty() {
+                quote!()
+            } else {
+                quote!(for i in 0..self.len()? {
+                    #func
+                })
+            }
+        } else {
+            quote!()
+        };
+        let val_compatible = if verify_sub.is_empty() {
+            quote!(_compatible)
+        } else {
+            quote!(compatible)
+        };
+
         let name = ident_new(self.name());
         let q = quote! {
             impl #name {
-                pub fn verify(&self, _compatible: bool) -> Result<(), Error> {
-                    self.cursor.verify_dynvec()
+                pub fn verify(&self, #val_compatible: bool) -> Result<(), Error> {
+                    self.cursor.verify_dynvec()?;
+                    #verify_sub;
+                    Ok(())
                 }
             }
         };
@@ -161,10 +248,19 @@ impl LazyReaderGenerator for ast::Table {
         generate_rust_common_table(output, self.name(), self.fields(), None)?;
         let field_count = self.fields().len();
         let name = ident_new(self.name());
+
+        let verify_fields = self
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(_i, f)| verify_filed(f));
+
         let q = quote! {
             impl #name {
                 pub fn verify(&self, compatible: bool) -> Result<(), Error> {
-                    self.cursor.verify_table(#field_count, compatible)
+                    self.cursor.verify_table(#field_count, compatible)?;
+                    #( #verify_fields )*
+                    Ok(())
                 }
             }
         };
@@ -552,4 +648,70 @@ fn generate_rust_slice_by(index: usize, fields_sizes: &Option<&[usize]>) -> Toke
             table_slice_by_index(#index)
         }
     }
+}
+
+fn has_verify(t: &TopDecl) -> bool {
+    match t {
+        TopDecl::Primitive(_) => false,
+        TopDecl::Option_(_) => true,
+        TopDecl::Union(_) => true,
+        TopDecl::Array(_) => {
+            let type_name_lower = t.name().to_lowercase();
+            match type_name_lower.as_ref() {
+                "uint8" | "int8" | "uint16" | "int16" | "uint32" | "int32" | "uint64" | "int64" => {
+                    false
+                }
+                _ => true,
+            }
+        }
+        TopDecl::Struct(_) => true,
+        TopDecl::FixVec(_) => false,
+        TopDecl::DynVec(_) => true,
+        TopDecl::Table(_) => true,
+    }
+}
+
+fn verify_typ(typ: &TopDecl, q_val: TokenStream) -> TokenStream {
+    if !has_verify(typ) {
+        quote!()
+    } else {
+        let type_name = ident_new(typ.name());
+        match typ {
+            TopDecl::Array(_) => {
+                quote!(
+                    #type_name::from(#q_val).verify(compatible)?;
+                )
+            }
+            TopDecl::Option_(v) => {
+                v.item().typ();
+
+                let func = verify_typ(v.item().typ().as_ref(), quote!(val));
+                if func.is_empty() {
+                    quote!()
+                } else {
+                    quote!(
+                        let val = #q_val;
+                        if val.is_some() {
+                            let val = val.unwrap();
+                            #func
+                        }
+                    )
+                }
+            }
+            _ => {
+                quote!(
+                    #q_val.verify(compatible)?;
+                )
+            }
+        }
+    }
+}
+
+fn verify_filed(f: &FieldDecl) -> TokenStream {
+    let field = ident_new(f.name());
+
+    let _val_name = f.name();
+    let _field_name = f.typ().name();
+
+    verify_typ(&f.typ().as_ref(), quote!(self.#field()?))
 }
