@@ -713,5 +713,6 @@ fn verify_typ(typ: &TopDecl, q_val: TokenStream) -> TokenStream {
 
 fn verify_filed(f: &FieldDecl) -> TokenStream {
     let field = ident_new(f.name());
-    verify_typ(&f.typ().as_ref(), quote!(self.#field()?))
+    let typ = f.typ();
+    verify_typ(typ.as_ref(), quote!(self.#field()?))
 }
