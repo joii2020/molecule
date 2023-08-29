@@ -56,7 +56,23 @@ impl LazyReaderGenerator for ast::Union {
 
             let typ = item.typ().as_ref();
 
-            let func = verify_typ(typ, quote!(self.#item_type_name()?));
+            let func = match typ {
+                TopDecl::Primitive(v) => {
+                    let fixed_size = v.size() + molecule::NUMBER_SIZE;
+                    quote!(self.cursor.verify_fixed_size(#fixed_size)?;)
+                }
+                TopDecl::FixVec(v) => {
+                    let item_size = v.item_size();
+                    if item_size > 1 {
+                        quote!(
+                            self.#item_type_name()?.verify(compatible)?;
+                        )
+                    } else {
+                        quote!()
+                    }
+                }
+                _ => verify_typ(typ, quote!(self.#item_type_name()?)),
+            };
             quote!(
                 #item_id => {
                     #func;
@@ -68,10 +84,11 @@ impl LazyReaderGenerator for ast::Union {
         let q = quote! {
             impl #name {
                 pub fn verify(&self, compatible: bool) -> Result<(), Error> {
-                    match self.item_id()? {
+                    let item_id = self.item_id()?;
+                    match item_id {
                         #( #verify_items )*
                         _ => {
-                            Ok(())
+                            Err(Error::UnknownItem(format!("unknow item id: {}", item_id)))
                         }
                     }
                 }
@@ -97,13 +114,15 @@ impl LazyReaderGenerator for ast::Array {
         let total_size = self.item_count() * self.item_size();
         let name = ident_new(self.name());
 
-        let verify_sub = if has_verify(self.item().typ()) {
+        let verify_sub = {
             let func = verify_typ(self.item().typ().as_ref(), quote!(self.get(i)?));
-            quote!(for i in 0..self.len() {
-                #func
-            })
-        } else {
-            quote!()
+            if func.is_empty() {
+                quote!()
+            } else {
+                quote!(for i in 0..self.len() {
+                    #func
+                })
+            }
         };
 
         let val_compatible = if verify_sub.is_empty() {
@@ -166,28 +185,13 @@ impl LazyReaderGenerator for ast::FixVec {
             None,
         )?;
 
-        let verify_sub = if has_verify(self.item().typ()) {
-            let func = verify_typ(self.item().typ().as_ref(), quote!(self.get(i)?));
-            quote!(for i in 0..self.len()? {
-                #func
-            })
-        } else {
-            quote!()
-        };
-        let val_compatible = if verify_sub.is_empty() {
-            quote!(_compatible)
-        } else {
-            quote!(compatible)
-        };
-
         let name = ident_new(self.name());
         let item_size = self.item_size();
 
         let q = quote! {
             impl #name {
-                pub fn verify(&self, #val_compatible: bool) -> Result<(), Error> {
+                pub fn verify(&self, _compatible: bool) -> Result<(), Error> {
                     self.cursor.verify_fixvec(#item_size)?;
-                    #verify_sub;
                     Ok(())
                 }
             }
@@ -210,7 +214,7 @@ impl LazyReaderGenerator for ast::DynVec {
             Some(self),
         )?;
 
-        let verify_sub = if has_verify(self.item().typ()) {
+        let verify_sub = {
             let func = verify_typ(self.item().typ().as_ref(), quote!(self.get(i)?));
             if func.is_empty() {
                 quote!()
@@ -219,8 +223,6 @@ impl LazyReaderGenerator for ast::DynVec {
                     #func
                 })
             }
-        } else {
-            quote!()
         };
         let val_compatible = if verify_sub.is_empty() {
             quote!(_compatible)
@@ -650,68 +652,66 @@ fn generate_rust_slice_by(index: usize, fields_sizes: &Option<&[usize]>) -> Toke
     }
 }
 
-fn has_verify(t: &TopDecl) -> bool {
-    match t {
-        TopDecl::Primitive(_) => false,
-        TopDecl::Option_(_) => true,
-        TopDecl::Union(_) => true,
-        TopDecl::Array(_) => {
-            let type_name_lower = t.name().to_lowercase();
-            match type_name_lower.as_ref() {
-                "uint8" | "int8" | "uint16" | "int16" | "uint32" | "int32" | "uint64" | "int64" => {
-                    false
-                }
-                _ => true,
+fn verify_typ(typ: &TopDecl, q_val: TokenStream) -> TokenStream {
+    let type_name = ident_new(typ.name());
+    match typ {
+        TopDecl::Primitive(_) => {
+            quote!()
+        }
+        TopDecl::Option_(v) => {
+            v.item().typ();
+
+            let func = verify_typ(v.item().typ().as_ref(), quote!(val));
+            if func.is_empty() {
+                quote!()
+            } else {
+                quote!(
+                    let val = #q_val;
+                    if val.is_some() {
+                        let val = val.unwrap();
+                        #func
+                    }
+                )
             }
         }
-        TopDecl::Struct(_) => true,
-        TopDecl::FixVec(_) => false,
-        TopDecl::DynVec(_) => true,
-        TopDecl::Table(_) => true,
-    }
-}
-
-fn verify_typ(typ: &TopDecl, q_val: TokenStream) -> TokenStream {
-    if !has_verify(typ) {
-        quote!()
-    } else {
-        let type_name = ident_new(typ.name());
-        match typ {
-            TopDecl::Array(_) => {
-                quote!(
-                    #type_name::from(#q_val).verify(compatible)?;
-                )
-            }
-            TopDecl::Option_(v) => {
-                v.item().typ();
-
-                let func = verify_typ(v.item().typ().as_ref(), quote!(val));
-                if func.is_empty() {
+        TopDecl::Union(_) => {
+            quote!(
+                #q_val.verify(compatible)?;
+            )
+        }
+        TopDecl::Array(_) => {
+            let type_name_lower = typ.name().to_lowercase();
+            match type_name_lower.as_ref() {
+                "uint8" | "int8" | "uint16" | "int16" | "uint32" | "int32" | "uint64" | "int64" => {
                     quote!()
-                } else {
-                    quote!(
-                        let val = #q_val;
-                        if val.is_some() {
-                            let val = val.unwrap();
-                            #func
-                        }
-                    )
                 }
+                _ => quote!(
+                    #type_name::from(#q_val).verify(compatible)?;
+                ),
             }
-            _ => {
-                quote!(
-                    #q_val.verify(compatible)?;
-                )
-            }
+        }
+        TopDecl::Struct(_) => {
+            quote!(
+                #q_val.verify(compatible)?;
+            )
+        }
+        TopDecl::FixVec(_) => {
+            quote!()
+        }
+        TopDecl::DynVec(_) => {
+            quote!(
+                #q_val.verify(compatible)?;
+            )
+        }
+        TopDecl::Table(_) => {
+            quote!(
+                #q_val.verify(compatible)?;
+            )
         }
     }
 }
 
 fn verify_filed(f: &FieldDecl) -> TokenStream {
     let field = ident_new(f.name());
-
-    let _val_name = f.name();
-    let _field_name = f.typ().name();
-
     verify_typ(&f.typ().as_ref(), quote!(self.#field()?))
 }
