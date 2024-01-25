@@ -470,8 +470,7 @@ impl_cursor_primitive!(i8);
 impl TryFrom<Cursor> for Vec<u8> {
     type Error = Error;
     fn try_from(cur: Cursor) -> Result<Self, Error> {
-        let mut buf = Vec::<u8>::new();
-        buf.resize(cur.size, 0);
+        let mut buf = vec![0u8; cur.size];
 
         let size = cur.read_at(buf.as_mut_slice())?;
         if size != buf.len() {
