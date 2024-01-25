@@ -102,6 +102,9 @@ pub struct TypesAll {
     f72: TypesUnionA,
     f73: TypesTableA,
     f74: TypesTableB,
+
+    f75: TypesUnionB,
+    f76: TypesUnionD,
 }
 
 impl TypesAll {
@@ -183,6 +186,8 @@ impl TypesAll {
             f72: TypesUnionA::new_rng(&mut rng, config),
             f73: TypesTableA::new_rng(&mut rng, config),
             f74: TypesTableB::new_rng(&mut rng, config),
+            f75: TypesUnionB::new_rng(&mut rng, config),
+            f76: TypesUnionD::new_rng(&mut rng, config),
         }
     }
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -268,6 +273,8 @@ impl TypesAll {
             .f72(self.f72.to_mol())
             .f73(self.f73.to_mol())
             .f74(self.f74.to_mol())
+            .f75(self.f75.to_mol())
+            .f76(self.f76.to_mol())
             .build();
 
         builder.as_reader().as_slice().to_vec()
@@ -512,7 +519,12 @@ impl TypesAll {
         self.f74
             .check(&all_in_one.f74()?)
             .map_err(|f| f.to(format!("f74:{}", f.as_str())))?;
-
+        self.f75
+            .check(&all_in_one.f75()?)
+            .map_err(|f| f.to(format!("f75:{}", f.as_str())))?;
+        self.f76
+            .check(&all_in_one.f76()?)
+            .map_err(|f| f.to(format!("f76:{}", f.as_str())))?;
         types_api::AllInOneReader::verify(&data, true).expect("check data");
 
         check_mol(
@@ -941,10 +953,10 @@ fn test_union() {
         .verify(true)
         .unwrap_err();
 
-        if item_id != 3 {
+        if item_id != 11 {  // exclude Bytes
             // Error length
             let mut buf = data.as_bytes().to_vec();
-            if item_id != 4 {
+            if item_id != 4278190081 {
                 buf.extend_from_slice(&rng.gen::<u32>().to_le_bytes());
             } else {
                 buf.extend_from_slice({

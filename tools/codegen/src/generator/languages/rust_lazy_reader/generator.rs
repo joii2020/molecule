@@ -29,8 +29,9 @@ impl LazyReaderGenerator for ast::Union {
         };
         writeln!(output, "{}", q)?;
 
-        for (item_index, item) in self.items().iter().enumerate() {
+        for (_item_index, item) in self.items().iter().enumerate() {
             let item_type_name = item.typ().name();
+            let item_id = item.id();
             let item_type_name = ident_new(&format!("as_{}", item_type_name.to_snake()));
             let (transformed_name, tc) = get_rust_type_category(item.typ());
             let convert_code = tc.gen_convert_code();
@@ -38,7 +39,7 @@ impl LazyReaderGenerator for ast::Union {
                 impl #name {
                     pub fn #item_type_name(&self) -> Result<#transformed_name, Error> {
                         let item = self.cursor.union_unpack()?;
-                        if item.item_id != #item_index {
+                        if item.item_id != #item_id {
                             return Err(Error::Header(format!("invalid item type id in union: {}", item.item_id)));
                         }
                         let cur = item.cursor.clone();
