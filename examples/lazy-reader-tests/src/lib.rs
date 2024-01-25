@@ -214,3 +214,89 @@ impl TypesUnionA {
         }
     }
 }
+
+pub enum TypesUnionB {
+    Byte(TypesArray<u8, 1>), // 2
+    Word(TypesArrayWord),    //4
+}
+impl BaseTypes for TypesUnionB {
+    fn new_rng(rng: &mut ThreadRng, config: &TypesConfig) -> Self {
+        let v = if config.min_size {
+            0 // Self::Byte
+        } else {
+            rng.gen_range(0..1)
+        };
+        match v {
+            0 => Self::Byte(TypesArray::new_rng(rng, config)),
+            1 => Self::Word(TypesArrayWord::new_rng(rng, config)),
+
+            _ => panic!("unknow error"),
+        }
+    }
+}
+impl Default for TypesUnionB {
+    fn default() -> Self {
+        Self::new_rng(&mut thread_rng(), &TypesConfig::default())
+    }
+}
+impl TypesUnionB {
+    pub fn to_mol(&self) -> types_api::UnionB {
+        let t = match self {
+            Self::Byte(v) => types_api::UnionBUnion::Byte(v.to_mol()),
+            Self::Word(v) => types_api::UnionBUnion::Word(v.to_mol2()),
+        };
+        types_api::UnionB::new_builder().set(t).build()
+    }
+
+    pub fn check(&self, d: &types_api2::UnionB) -> ResCheckErr {
+        // let item_id = d.item_id();
+
+        match self {
+            Self::Byte(v) => v.check(&d.as_byte()?),
+            Self::Word(v) => v.check2(&d.as_word()?.into()),
+        }
+    }
+}
+
+pub enum TypesUnionD {
+    Word(TypesArrayWord),    //2
+    Byte(TypesArray<u8, 1>), // 4
+}
+impl BaseTypes for TypesUnionD {
+    fn new_rng(rng: &mut ThreadRng, config: &TypesConfig) -> Self {
+        let v = if config.min_size {
+            0 // Self::Byte
+        } else {
+            rng.gen_range(0..1)
+        };
+        match v {
+            0 => Self::Word(TypesArrayWord::new_rng(rng, config)),
+            1 => Self::Byte(TypesArray::new_rng(rng, config)),
+
+            _ => panic!("unknow error"),
+        }
+    }
+}
+impl Default for TypesUnionD {
+    fn default() -> Self {
+        Self::new_rng(&mut thread_rng(), &TypesConfig::default())
+    }
+}
+impl TypesUnionD {
+    pub fn to_mol(&self) -> types_api::UnionD {
+        let t = match self {
+            Self::Word(v) => types_api::UnionDUnion::Word(v.to_mol2()),
+            Self::Byte(v) => types_api::UnionDUnion::Byte(v.to_mol()),
+        };
+        types_api::UnionD::new_builder().set(t).build()
+    }
+
+    pub fn check(&self, d: &types_api2::UnionD) -> ResCheckErr {
+        // let item_id = d.item_id();
+
+        match self {
+            Self::Word(v) => v.check2(&d.as_word()?.into()),
+            Self::Byte(v) => v.check(&d.as_byte()?),
+        }
+    }
+}
