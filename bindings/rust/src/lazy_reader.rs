@@ -491,6 +491,24 @@ impl TryFrom<Cursor> for Vec<u8> {
     }
 }
 
+impl<const N: usize> TryFrom<Cursor> for [u8; N] {
+    type Error = Error;
+    fn try_from(cur: Cursor) -> Result<Self, Error> {
+        let mut buf = [0u8; N];
+
+        let size = cur.read_at(buf.as_mut_slice())?;
+        if size != N || size != cur.size {
+            return Err(Error::Read(format!(
+                "TryFrom<Cursor>: size({}) != buf.len()({})",
+                size,
+                buf.len()
+            )));
+        }
+
+        Ok(buf)
+    }
+}
+
 // it's an example about how to build a data source from memory
 impl Read for Vec<u8> {
     fn read(&self, buf: &mut [u8], offset: usize) -> Result<usize, Error> {
@@ -519,6 +537,12 @@ impl Read for Vec<u8> {
 impl From<Vec<u8>> for Cursor {
     fn from(mem: Vec<u8>) -> Self {
         Cursor::new(mem.len(), Box::new(mem))
+    }
+}
+
+impl<const N: usize> From<[u8; N]> for Cursor {
+    fn from(mem: [u8; N]) -> Self {
+        Cursor::new(mem.len(), Box::new(mem.to_vec()))
     }
 }
 // end of example
