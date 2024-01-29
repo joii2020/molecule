@@ -23,7 +23,14 @@ pub enum Error {
     Overflow(String),
     Read(String),
     Verify(String),
+    Unknow(String),
 }
+impl From<core::convert::Infallible> for Error {
+    fn from(value: core::convert::Infallible) -> Self {
+        Self::Unknow(format!("conver failed: {:?}", value))
+    }
+}
+
 pub trait Read {
     /**
      * try to read `buf.len()` bytes from data source with `offset`, then fill it in `buf`.

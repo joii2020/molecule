@@ -520,7 +520,7 @@ impl TypeCategory {
                             if cur.option_is_none() {
                                 Ok(None)
                             } else {
-                                Ok(Some(cur.into()))
+                                Ok(Some(cur.try_into()?))
                             }
                         }
                     } else {
@@ -557,7 +557,7 @@ impl TypeCategory {
             }
             TypeCategory::Type => quote! { Ok(cur.into()) },
             TypeCategory::Primitive => quote! { cur.try_into() },
-            TypeCategory::Array => quote! { Ok(cur) },
+            TypeCategory::Array => quote! { Ok(cur.try_into()?) },
             TypeCategory::FixVec => {
                 quote! {
                     cur.convert_to_rawbytes()
@@ -592,7 +592,7 @@ fn get_rust_type_category(typ: &TopDecl) -> (TokenStream, TypeCategory) {
                     if let TopDecl::Primitive(_) = a.item().typ().as_ref() {
                         // array of byte
                         tc = TypeCategory::Array;
-                        quote! { Cursor }
+                        quote! { Vec<u8> }
                     } else {
                         // array of Types
                         tc = TypeCategory::Type;
@@ -680,15 +680,23 @@ fn verify_typ(typ: &TopDecl, q_val: TokenStream) -> TokenStream {
                 #q_val.verify(compatible)?;
             )
         }
-        TopDecl::Array(_) => {
+        TopDecl::Array(sub_typ) => {
             let type_name_lower = typ.name().to_lowercase();
             match type_name_lower.as_ref() {
                 "uint8" | "int8" | "uint16" | "int16" | "uint32" | "int32" | "uint64" | "int64" => {
                     quote!()
                 }
-                _ => quote!(
-                    #type_name::from(#q_val).verify(compatible)?;
-                ),
+                _ => {
+                    if let TopDecl::Primitive(_) = sub_typ.item().typ().as_ref() {
+                        quote!(
+                            #type_name::from(Cursor::try_from(#q_val)?).verify(compatible)?;
+                        )
+                    } else {
+                        quote!(
+                            #type_name::from(#q_val).verify(compatible)?;
+                        )
+                    }
+                }
             }
         }
         TopDecl::Struct(_) => {
