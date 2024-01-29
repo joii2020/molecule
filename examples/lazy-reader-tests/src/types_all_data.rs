@@ -293,53 +293,53 @@ impl TypesAll {
             .check(&all_in_one.f0()?)
             .map_err(|f| f.to(format!("f0:{}", f.as_str())))?;
         self.f1
-            .check(&all_in_one.f1()?.into())
+            .check(&Cursor::try_from(all_in_one.f1()?)?.into())
             .map_err(|f| f.to(format!("f1:{}", f.as_str())))?;
         self.f2
-            .check(&all_in_one.f2()?.into())
+            .check(&Cursor::try_from(all_in_one.f2()?)?.into())
             .map_err(|f| f.to(format!("f2:{}", f.as_str())))?;
         self.f3
-            .check(&all_in_one.f3()?.into())
+            .check(&Cursor::try_from(all_in_one.f3()?)?.into())
             .map_err(|f| f.to(format!("f3:{}", f.as_str())))?;
         self.f4
-            .check(&all_in_one.f4()?.into())
+            .check(&Cursor::try_from(all_in_one.f4()?)?.into())
             .map_err(|f| f.to(format!("f74:{}", f.as_str())))?;
         self.f5
-            .check(&all_in_one.f5()?.into())
+            .check(&Cursor::try_from(all_in_one.f5()?)?.into())
             .map_err(|f| f.to(format!("f5:{}", f.as_str())))?;
         self.f6
-            .check(&all_in_one.f6()?.into())
+            .check(&Cursor::try_from(all_in_one.f6()?)?.into())
             .map_err(|f| f.to(format!("f6:{}", f.as_str())))?;
         self.f7
-            .check(&all_in_one.f7()?.into())
+            .check(&Cursor::try_from(all_in_one.f7()?)?.into())
             .map_err(|f| f.to(format!("f7:{}", f.as_str())))?;
         self.f8
-            .check(&all_in_one.f8()?.into())
+            .check(&Cursor::try_from(all_in_one.f8()?)?.into())
             .map_err(|f| f.to(format!("f8:{}", f.as_str())))?;
         self.f9
-            .check(&all_in_one.f9()?.into())
+            .check(&Cursor::try_from(all_in_one.f9()?)?.into())
             .map_err(|f| f.to(format!("f9:{}", f.as_str())))?;
         self.f10
-            .check(&all_in_one.f10()?.into())
+            .check(&Cursor::try_from(all_in_one.f10()?)?.into())
             .map_err(|f| f.to(format!("f10:{}", f.as_str())))?;
         self.f11
-            .check(&all_in_one.f11()?.into())
+            .check(&Cursor::try_from(all_in_one.f11()?)?.into())
             .map_err(|f| f.to(format!("f11:{}", f.as_str())))?;
         self.f12
-            .check(&all_in_one.f12()?.into())
+            .check(&Cursor::try_from(all_in_one.f12()?)?.into())
             .map_err(|f| f.to(format!("f12:{}", f.as_str())))?;
         self.f13
-            .check(&all_in_one.f13()?.into())
+            .check(&Cursor::try_from(all_in_one.f13()?)?.into())
             .map_err(|f| f.to(format!("f13:{}", f.as_str())))?;
         self.f14
-            .check(&all_in_one.f14()?.into())
+            .check(&Cursor::try_from(all_in_one.f14()?)?.into())
             .map_err(|f| f.to(format!("f14:{}", f.as_str())))?;
         self.f15
-            .check(&all_in_one.f15()?.into())
+            .check(&Cursor::try_from(all_in_one.f15()?)?.into())
             .map_err(|f| f.to(format!("f15:{}", f.as_str())))?;
 
         self.f16
-            .check2(&all_in_one.f16()?.into())
+            .check2(&Cursor::try_from(all_in_one.f16()?)?.into())
             .map_err(|f| f.to(format!("f16:{}", f.as_str())))?;
         self.f17
             .check(&all_in_one.f17()?.into())
@@ -953,7 +953,8 @@ fn test_union() {
         .verify(true)
         .unwrap_err();
 
-        if item_id != 11 {  // exclude Bytes
+        if item_id != 11 {
+            // exclude Bytes
             // Error length
             let mut buf = data.as_bytes().to_vec();
             if item_id != 4278190081 {

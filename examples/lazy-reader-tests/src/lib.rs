@@ -10,6 +10,7 @@ pub mod types_struct;
 pub mod types_table;
 pub mod types_vec;
 
+use molecule::lazy_reader::Cursor;
 use molecule::prelude::{Builder, Entity};
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 use std::fmt::Debug;
@@ -144,7 +145,13 @@ impl From<molecule::lazy_reader::Error> for TypesCheckErr {
             Overflow(v) => Self::Mol2Err(format!("Overflow({})", v)),
             Read(v) => Self::Mol2Err(format!("Read({})", v)),
             Verify(v) => Self::Mol2Err(format!("Verify({})", v)),
+            Unknow(v) => Self::Mol2Err(format!("Unknow({})", v)),
         }
+    }
+}
+impl From<std::convert::Infallible> for TypesCheckErr {
+    fn from(value: std::convert::Infallible) -> Self {
+        Self::Mol2Err(format!("conver failed: {:?}", value))
     }
 }
 
@@ -204,7 +211,7 @@ impl TypesUnionA {
 
         match self {
             Self::Byte(v) => v.check(&d.as_byte()?),
-            Self::Word(v) => v.check2(&d.as_word()?.into()),
+            Self::Word(v) => v.check2(&Cursor::try_from(d.as_word()?)?.into()),
             Self::StructA(v) => v.check(&d.as_struct_a()?),
             Self::Bytes(v) => v.check(&d.as_bytes()?.try_into().unwrap()),
             Self::Words(v) => v.check(&d.as_words()?.into()),
@@ -253,7 +260,7 @@ impl TypesUnionB {
 
         match self {
             Self::Byte(v) => v.check(&d.as_byte()?),
-            Self::Word(v) => v.check2(&d.as_word()?.into()),
+            Self::Word(v) => v.check2(&Cursor::try_from(d.as_word()?)?.into()),
         }
     }
 }
@@ -295,7 +302,7 @@ impl TypesUnionD {
         // let item_id = d.item_id();
 
         match self {
-            Self::Word(v) => v.check2(&d.as_word()?.into()),
+            Self::Word(v) => v.check2(&Cursor::try_from(d.as_word()?)?.into()),
             Self::Byte(v) => v.check(&d.as_byte()?),
         }
     }
