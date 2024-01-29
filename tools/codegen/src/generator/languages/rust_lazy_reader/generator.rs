@@ -504,7 +504,7 @@ impl TypeCategory {
     }
     pub fn gen_convert_code(&self) -> TokenStream {
         match self {
-            &TypeCategory::Option(level, flag, has_from) => {
+            &TypeCategory::Option(level, flag, _has_from) => {
                 if level == 1 {
                     if flag {
                         quote! {
@@ -515,14 +515,15 @@ impl TypeCategory {
                                 Ok(Some(cur.into()))
                             }
                         }
-                    } else if has_from {
-                        quote! {
-                            if cur.option_is_none() {
-                                Ok(None)
-                            } else {
-                                Ok(Some(cur.try_into()?))
-                            }
-                        }
+                    // Here is a warning: this `if` has identical blocks
+                    // } else if has_from {
+                    //     quote! {
+                    //         if cur.option_is_none() {
+                    //             Ok(None)
+                    //         } else {
+                    //             Ok(Some(cur.try_into()?))
+                    //         }
+                    //     }
                     } else {
                         quote! {
                             if cur.option_is_none() {
@@ -592,7 +593,8 @@ fn get_rust_type_category(typ: &TopDecl) -> (TokenStream, TypeCategory) {
                     if let TopDecl::Primitive(_) = a.item().typ().as_ref() {
                         // array of byte
                         tc = TypeCategory::Array;
-                        quote! { Vec<u8> }
+                        let len = a.item_count();
+                        quote! { [u8; #len] }
                     } else {
                         // array of Types
                         tc = TypeCategory::Type;

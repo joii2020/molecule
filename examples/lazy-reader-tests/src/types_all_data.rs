@@ -957,7 +957,7 @@ fn test_union() {
             // exclude Bytes
             // Error length
             let mut buf = data.as_bytes().to_vec();
-            if item_id != 4278190081 {
+            if item_id != 0xFF000001 {
                 buf.extend_from_slice(&rng.gen::<u32>().to_le_bytes());
             } else {
                 buf.extend_from_slice({
