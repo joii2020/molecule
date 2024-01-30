@@ -937,21 +937,20 @@ fn test_union() {
 
         // success
         let buf = data.as_bytes().to_vec();
-        types_api2::UnionA {
-            cursor: new_cursor(&buf),
-        }
-        .verify(true)
-        .unwrap();
+
+        types_api2::UnionA::try_from(new_cursor(&buf))
+            .expect("new UnionA failed")
+            .verify(true)
+            .expect("verify unionA failed");
 
         // Error item
         let mut buf = data.as_bytes().to_vec();
         buf[0..4].copy_from_slice(&rng.gen_range(8u32..0xFFFFFFFEu32).to_le_bytes());
 
-        types_api2::UnionA {
-            cursor: new_cursor(&buf),
+        let union_a = types_api2::UnionA::try_from(new_cursor(&buf));
+        if union_a.is_ok() && union_a.unwrap().verify(true).is_ok() {
+            panic!("verify failedunionA failed");
         }
-        .verify(true)
-        .unwrap_err();
 
         if item_id != 11 {
             // exclude Bytes
@@ -969,11 +968,10 @@ fn test_union() {
                 })
             }
 
-            types_api2::UnionA {
-                cursor: new_cursor(&buf),
+            let union_a = types_api2::UnionA::try_from(new_cursor(&buf));
+            if union_a.is_ok() && union_a.unwrap().verify(true).is_ok() {
+                panic!("verify failedunionA failed");
             }
-            .verify(true)
-            .unwrap_err();
         }
     }
 
