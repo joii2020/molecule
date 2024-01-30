@@ -210,14 +210,41 @@ impl TypesUnionA {
         // let item_id = d.item_id();
 
         match self {
-            Self::Byte(v) => v.check(&d.as_byte()?),
-            Self::Word(v) => v.check2(&Cursor::try_from(d.as_word()?)?.into()),
-            Self::StructA(v) => v.check(&d.as_struct_a()?),
-            Self::Bytes(v) => v.check(&d.as_bytes()?.try_into().unwrap()),
-            Self::Words(v) => v.check(&d.as_words()?.into()),
-            Self::Table0(v) => v.check(&d.as_table0()?),
-            Self::Table6(v) => v.check(&d.as_table6()?),
-            Self::Table6Opt(v) => v.check(&d.as_table6_opt()?),
+            Self::Byte(v) => match d {
+                types_api2::UnionA::Byte(v2) => v.check(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
+            Self::Word(v) => match d {
+                types_api2::UnionA::Word(v2) => v.check2(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
+            Self::StructA(v) => match d {
+                types_api2::UnionA::StructA(v2) => v.check(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
+            Self::Bytes(v) => match d {
+                types_api2::UnionA::Bytes(v2) => {
+                    let v2: Vec<u8> = v2.cursor.clone().try_into()?;
+                    v.check(&v2)
+                }
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
+            Self::Words(v) => match d {
+                types_api2::UnionA::Words(v2) => v.check(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
+            Self::Table0(v) => match d {
+                types_api2::UnionA::Table0(v2) => v.check(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
+            Self::Table6(v) => match d {
+                types_api2::UnionA::Table6(v2) => v.check(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
+            Self::Table6Opt(v) => match d {
+                types_api2::UnionA::Table6Opt(v2) => v.check(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
         }
     }
 }
@@ -259,8 +286,14 @@ impl TypesUnionB {
         // let item_id = d.item_id();
 
         match self {
-            Self::Byte(v) => v.check(&d.as_byte()?),
-            Self::Word(v) => v.check2(&Cursor::try_from(d.as_word()?)?.into()),
+            Self::Byte(v) => match d {
+                types_api2::UnionB::Byte(v2) => v.check(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
+            Self::Word(v) => match d {
+                types_api2::UnionB::Word(v2) => v.check2(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
         }
     }
 }
@@ -302,8 +335,14 @@ impl TypesUnionD {
         // let item_id = d.item_id();
 
         match self {
-            Self::Word(v) => v.check2(&Cursor::try_from(d.as_word()?)?.into()),
-            Self::Byte(v) => v.check(&d.as_byte()?),
+            Self::Word(v) => match d {
+                types_api2::UnionD::Word(v2) => v.check2(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
+            Self::Byte(v) => match d {
+                types_api2::UnionD::Byte(v2) => v.check(v2),
+                _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
+            },
         }
     }
 }

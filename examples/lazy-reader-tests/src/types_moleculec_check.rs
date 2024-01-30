@@ -659,38 +659,38 @@ pub fn check_f71(d1: &types_api::BytesOptVec, d2: &types_api2::BytesOptVec) -> R
 }
 pub fn check_f72(d1: &types_api::UnionA, d2: &types_api2::UnionA) -> ResCheckErr {
     match d1.to_enum() {
-        types_api::UnionAUnion::Byte(v) => {
-            let v2 = d2.as_byte()?;
-            TypesCheckErr::check_1_data(&v, &v2.into())?;
-        }
-        types_api::UnionAUnion::Word(v) => {
-            let v2 = d2.as_word()?;
-            check_f16(&v, &Cursor::try_from(v2)?.into())?;
-        }
-        types_api::UnionAUnion::StructA(v) => {
-            let v2 = d2.as_struct_a()?;
-            check_f28(&v, &v2)?;
-        }
-        types_api::UnionAUnion::Bytes(v) => {
-            let v2 = d2.as_bytes()?;
-            check_f41(&v, &v2.try_into().unwrap())?;
-        }
-        types_api::UnionAUnion::Words(v) => {
-            let v2 = d2.as_words()?;
-            check_f42(&v, &v2)?;
-        }
-        types_api::UnionAUnion::Table0(v) => {
-            let v2 = d2.as_table0()?;
-            check_f50(&v, &v2)?;
-        }
-        types_api::UnionAUnion::Table6(v) => {
-            let v2 = d2.as_table6()?;
-            check_f56(&v, &v2)?;
-        }
-        types_api::UnionAUnion::Table6Opt(v) => {
-            let v2 = d2.as_table6_opt()?;
-            check_f66(&v.to_opt(), &v2)?;
-        }
+        types_api::UnionAUnion::Byte(v) => match d2 {
+            types_api2::UnionA::Byte(v2) => TypesCheckErr::check_1_data(&v, &v2.clone().into())?,
+            _ => return Err(TypesCheckErr::Data(format!("check union type is failed"))),
+        },
+        types_api::UnionAUnion::Word(v) => match d2 {
+            types_api2::UnionA::Word(v2) => check_f16(&v, v2)?,
+            _ => return Err(TypesCheckErr::Data(format!("check union type is failed"))),
+        },
+        types_api::UnionAUnion::StructA(v) => match d2 {
+            types_api2::UnionA::StructA(v2) => check_f28(&v, &v2)?,
+            _ => return Err(TypesCheckErr::Data(format!("check union type is failed"))),
+        },
+        types_api::UnionAUnion::Bytes(v) => match d2 {
+            types_api2::UnionA::Bytes(v2) => check_f41(&v, &v2.cursor)?,
+            _ => return Err(TypesCheckErr::Data(format!("check union type is failed"))),
+        },
+        types_api::UnionAUnion::Words(v) => match d2 {
+            types_api2::UnionA::Words(v2) => check_f42(&v, &v2)?,
+            _ => return Err(TypesCheckErr::Data(format!("check union type is failed"))),
+        },
+        types_api::UnionAUnion::Table0(v) => match d2 {
+            types_api2::UnionA::Table0(v2) => check_f50(&v, v2)?,
+            _ => return Err(TypesCheckErr::Data(format!("check union type is failed"))),
+        },
+        types_api::UnionAUnion::Table6(v) => match d2 {
+            types_api2::UnionA::Table6(v2) => check_f56(&v, v2)?,
+            _ => return Err(TypesCheckErr::Data(format!("check union type is failed"))),
+        },
+        types_api::UnionAUnion::Table6Opt(v) => match d2 {
+            types_api2::UnionA::Table6Opt(v2) => check_f66(&v.to_opt(), v2)?,
+            _ => return Err(TypesCheckErr::Data(format!("check union type is failed"))),
+        },
     };
 
     Ok(())

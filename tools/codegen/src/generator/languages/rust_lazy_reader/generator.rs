@@ -1,96 +1,160 @@
-use super::{ident_new, LazyReaderGenerator};
+use super::{ident_new, ident_new_camel, LazyReaderGenerator};
 use crate::ast::{self, HasName, *};
-use case::CaseExt;
 use proc_macro2::{Literal, TokenStream};
 use quote::quote;
 use std::io;
+
+impl ast::Union {
+    fn get_item_name(typ: &TopDecl) -> TokenStream {
+        let item_name = ident_new_camel(&format!("{}", typ.name()));
+        let item_type_name = Self::get_type_name(typ);
+
+        quote! {
+            #item_name(#item_type_name),
+        }
+    }
+
+    fn get_type_name(typ: &TopDecl) -> TokenStream {
+        match typ {
+            TopDecl::Primitive(v) => {
+                let name = ident_new(match v.name().to_lowercase().as_str() {
+                    "byte" => "u8",
+                    "uint8" => "u8",
+                    "int8" => "i8",
+                    "uint16" => "u16",
+                    "int16" => "i16",
+                    "uint32" => "u32",
+                    "int32" => "i32",
+                    "uint64" => "u64",
+                    "int64" => "i64",
+                    _ => {
+                        panic!("unknow type: {}", v.name())
+                    }
+                });
+                quote!(#name)
+            }
+            TopDecl::Option_(o) => {
+                let name = Self::get_type_name(&o.item().typ());
+                quote!(Option<#name>)
+            }
+            _ => {
+                let name = ident_new_camel(typ.name());
+                quote!(#name)
+            }
+        }
+    }
+}
 
 impl LazyReaderGenerator for ast::Union {
     fn gen_rust<W: io::Write>(&self, output: &mut W) -> io::Result<()> {
         let name = ident_new(self.name());
 
-        let q = quote! {
-            pub struct #name {
-                pub cursor: Cursor,
+        // generate enum:
+        let q = self.items().iter().map(|item| {
+            let item_name = Self::get_item_name(item.typ().as_ref());
+            quote! {
+                #item_name
             }
-
-            impl From<Cursor> for #name {
-                fn from(cursor: Cursor) -> Self {
-                    Self { cursor }
+        });
+        writeln!(
+            output,
+            "{}",
+            quote! {
+                pub enum #name {
+                    #( #q )*
                 }
             }
+        )?;
 
-            impl #name {
-                pub fn item_id(&self) -> Result<usize, Error> {
-                    let item = self.cursor.union_unpack()?;
-                    Ok(item.item_id)
+        // generate enum try_from
+        let q = self.items().iter().map(|item| {
+            let item_id = item.id();
+            let item_name_str = item.typ().name();
+            let item_name = ident_new_camel(&format!("{}", item_name_str));
+            let item_type = Self::get_type_name(item.typ());
+
+            let q = match item.typ().as_ref() {
+                TopDecl::Primitive(a) => match a.name().to_lowercase().as_str() {
+                    "byte" | "uint8" | "int8" | "uint16" | "int16" | "uint32" | "int32"
+                    | "uint64" | "int64" => {
+                        quote! {{
+                            cur.verify_fixed_size(core::mem::size_of::<#item_type>())?;
+                            cur.try_into()?
+                        }}
+                    }
+                    _ => {
+                        quote!(cur.into())
+                    }
+                },
+                TopDecl::Option_(o) => {
+                    let item_name = ident_new_camel(o.item().typ().name());
+                    quote! {
+                        if cur.option_is_none() {
+                            None
+                        } else {
+                            Some(#item_name::from(cur))
+                        }
+                    }
+                }
+                _ => {
+                    quote!(cur.into())
+                }
+            };
+
+            quote! {
+                #item_id => {
+                    Ok(Self::#item_name(#q))
+                }
+            }
+        });
+        let q = quote! {
+            impl TryFrom<Cursor> for #name {
+                type Error = Error;
+                fn try_from(cur: Cursor) -> Result<Self, Self::Error> {
+                    let item = cur.union_unpack()?;
+                    let mut cur = cur;
+                    cur.add_offset(NUMBER_SIZE)?;
+                    cur.sub_size(NUMBER_SIZE)?;
+                    match item.item_id {
+                        #( #q )*
+                        _ => Err(Error::UnknownItem(format!("unknow item id: {}", item.item_id)))
+                    }
                 }
             }
         };
         writeln!(output, "{}", q)?;
 
-        for (_item_index, item) in self.items().iter().enumerate() {
-            let item_type_name = item.typ().name();
-            let item_id = item.id();
-            let item_type_name = ident_new(&format!("as_{}", item_type_name.to_snake()));
-            let (transformed_name, tc) = get_rust_type_category(item.typ());
-            let convert_code = tc.gen_convert_code();
-            let q = quote! {
-                impl #name {
-                    pub fn #item_type_name(&self) -> Result<#transformed_name, Error> {
-                        let item = self.cursor.union_unpack()?;
-                        if item.item_id != #item_id {
-                            return Err(Error::Header(format!("invalid item type id in union: {}", item.item_id)));
-                        }
-                        let cur = item.cursor.clone();
-                        #convert_code
-                    }
-                }
-            };
-            writeln!(output, "{}", q)?;
-        }
-
+        // generate verify
         let verify_items = self.items().iter().enumerate().map(|(_i, item)| {
-            let item_id = item.id();
-            let item_type_name = item.typ().name();
-            let item_type_name = ident_new(&format!("as_{}", item_type_name.to_snake()));
-
-            let typ = item.typ().as_ref();
-
-            let func = match typ {
-                TopDecl::Primitive(v) => {
-                    let fixed_size = v.size() + molecule::NUMBER_SIZE;
-                    quote!(self.cursor.verify_fixed_size(#fixed_size)?;)
+            let item_name = ident_new_camel(&format!("{}", item.typ().name()));
+            match item.typ().as_ref() {
+                TopDecl::Primitive(_) => {
+                    quote!( Self::#item_name(_v) =>  Ok(()), )
                 }
-                TopDecl::FixVec(v) => {
-                    let item_size = v.item_size();
-                    if item_size > 1 {
-                        quote!(
-                            self.#item_type_name()?.verify(compatible)?;
-                        )
-                    } else {
-                        quote!()
+                TopDecl::Option_(_) => {
+                    quote! {
+                        Self::#item_name(v) => {
+                            if v.is_some() {
+                                v.as_ref().unwrap().verify(compatible)?;
+                            }
+                            Ok(())
+                        },
                     }
                 }
-                _ => verify_typ(typ, quote!(self.#item_type_name()?)),
-            };
-            quote!(
-                #item_id => {
-                    #func;
-                    Ok(())
-                }
-            )
+                _ => quote! {
+                    Self::#item_name(v) => {
+                        v.verify(compatible)?;
+                        Ok(())
+                    },
+                },
+            }
         });
 
         let q = quote! {
             impl #name {
                 pub fn verify(&self, compatible: bool) -> Result<(), Error> {
-                    let item_id = self.item_id()?;
-                    match item_id {
+                    match self {
                         #( #verify_items )*
-                        _ => {
-                            Err(Error::UnknownItem(format!("unknow item id: {}", item_id)))
-                        }
                     }
                 }
             }
@@ -493,6 +557,7 @@ enum TypeCategory {
     // 2nd: is nested type is FixVec or not
     // 3rd: has From<T>
     Option(u32, bool, bool),
+    Union,
 }
 
 impl TypeCategory {
@@ -558,11 +623,14 @@ impl TypeCategory {
             }
             TypeCategory::Type => quote! { Ok(cur.into()) },
             TypeCategory::Primitive => quote! { cur.try_into() },
-            TypeCategory::Array => quote! { Ok(cur.try_into()?) },
+            TypeCategory::Array => quote! { cur.try_into() },
             TypeCategory::FixVec => {
                 quote! {
                     cur.convert_to_rawbytes()
                 }
+            }
+            TypeCategory::Union => {
+                quote!(cur.try_into())
             }
         }
     }
@@ -630,6 +698,9 @@ fn get_rust_type_category(typ: &TopDecl) -> (TokenStream, TypeCategory) {
                     transformed_name = quote! { Option<#inner_name> };
                 }
             }
+        }
+        TopDecl::Union(_) => {
+            tc = TypeCategory::Union;
         }
         _ => {
             tc = TypeCategory::Type;
