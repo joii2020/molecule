@@ -224,8 +224,7 @@ impl TypesUnionA {
             },
             Self::Bytes(v) => match d {
                 types_api2::UnionA::Bytes(v2) => {
-                    let v2: Vec<u8> = v2.cursor.clone().try_into()?;
-                    v.check(&v2)
+                    v.check(&v2.clone().try_into()?)
                 }
                 _ => Err(TypesCheckErr::Data(format!("check union type is failed"))),
             },
