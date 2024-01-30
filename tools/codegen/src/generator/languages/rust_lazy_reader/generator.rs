@@ -6,7 +6,7 @@ use std::io;
 
 impl ast::Union {
     fn get_item_name(typ: &TopDecl) -> TokenStream {
-        let item_name = ident_new_camel(&format!("{}", typ.name()));
+        let item_name = ident_new_camel(typ.name());
         let item_type_name = Self::get_type_name(typ);
 
         quote! {
@@ -34,8 +34,16 @@ impl ast::Union {
                 quote!(#name)
             }
             TopDecl::Option_(o) => {
-                let name = Self::get_type_name(&o.item().typ());
+                let name = Self::get_type_name(o.item().typ());
                 quote!(Option<#name>)
+            }
+            TopDecl::FixVec(v) => {
+                if let TopDecl::Primitive(_) = v.item().typ().as_ref() {
+                    quote!(Cursor)
+                } else {
+                    let name = ident_new_camel(typ.name());
+                    quote!(#name)
+                }
             }
             _ => {
                 let name = ident_new_camel(typ.name());
@@ -70,7 +78,7 @@ impl LazyReaderGenerator for ast::Union {
         let q = self.items().iter().map(|item| {
             let item_id = item.id();
             let item_name_str = item.typ().name();
-            let item_name = ident_new_camel(&format!("{}", item_name_str));
+            let item_name = ident_new_camel(item_name_str);
             let item_type = Self::get_type_name(item.typ());
 
             let q = match item.typ().as_ref() {
@@ -88,16 +96,39 @@ impl LazyReaderGenerator for ast::Union {
                 },
                 TopDecl::Option_(o) => {
                     let item_name = ident_new_camel(o.item().typ().name());
-                    quote! {
+                    quote! {{
                         if cur.option_is_none() {
                             None
                         } else {
                             Some(#item_name::from(cur))
                         }
+                    }}
+                }
+                TopDecl::FixVec(v) => {
+                    if let TopDecl::Primitive(_) = v.item().typ().as_ref() {
+                        quote! {{
+                            if cur.fixvec_length()? != cur.size - NUMBER_SIZE {
+                                return Err(Error::TotalSize(format!(
+                                    "total_size: {} != {}",
+                                    cur.fixvec_length()?,
+                                    cur.size
+                                )));
+                            }
+
+                            cur.add_offset(NUMBER_SIZE)?;
+                            cur.sub_size(NUMBER_SIZE)?;
+                            cur
+                        }}
+                    } else {
+                        quote! {
+                            cur.into()
+                        }
                     }
                 }
                 _ => {
-                    quote!(cur.into())
+                    quote! {
+                        cur.into()
+                    }
                 }
             };
 
@@ -112,9 +143,11 @@ impl LazyReaderGenerator for ast::Union {
                 type Error = Error;
                 fn try_from(cur: Cursor) -> Result<Self, Self::Error> {
                     let item = cur.union_unpack()?;
+
                     let mut cur = cur;
                     cur.add_offset(NUMBER_SIZE)?;
                     cur.sub_size(NUMBER_SIZE)?;
+
                     match item.item_id {
                         #( #q )*
                         _ => Err(Error::UnknownItem(format!("unknow item id: {}", item.item_id)))
@@ -126,7 +159,7 @@ impl LazyReaderGenerator for ast::Union {
 
         // generate verify
         let verify_items = self.items().iter().enumerate().map(|(_i, item)| {
-            let item_name = ident_new_camel(&format!("{}", item.typ().name()));
+            let item_name = ident_new_camel(item.typ().name());
             match item.typ().as_ref() {
                 TopDecl::Primitive(_) => {
                     quote!( Self::#item_name(_v) =>  Ok(()), )
@@ -139,6 +172,20 @@ impl LazyReaderGenerator for ast::Union {
                             }
                             Ok(())
                         },
+                    }
+                }
+                TopDecl::FixVec(v) => {
+                    if let TopDecl::Primitive(_) = v.item().typ().as_ref() {
+                        quote! {
+                            Self::#item_name(_v) => Ok(()),
+                        }
+                    } else {
+                        quote! {
+                            Self::#item_name(v) => {
+                                v.verify(compatible)?;
+                                Ok(())
+                            },
+                        }
                     }
                 }
                 _ => quote! {

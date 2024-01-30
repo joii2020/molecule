@@ -672,7 +672,7 @@ pub fn check_f72(d1: &types_api::UnionA, d2: &types_api2::UnionA) -> ResCheckErr
             _ => return Err(TypesCheckErr::Data(format!("check union type is failed"))),
         },
         types_api::UnionAUnion::Bytes(v) => match d2 {
-            types_api2::UnionA::Bytes(v2) => check_f41(&v, &v2.cursor)?,
+            types_api2::UnionA::Bytes(v2) => check_f41(&v, &v2)?,
             _ => return Err(TypesCheckErr::Data(format!("check union type is failed"))),
         },
         types_api::UnionAUnion::Words(v) => match d2 {

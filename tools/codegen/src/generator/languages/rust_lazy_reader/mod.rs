@@ -50,13 +50,11 @@ fn ident_new_camel(name: &str) -> Ident {
     for c in name.chars() {
         if c == '_' {
             capitalize_next = true;
+        } else if capitalize_next {
+            camel_case.push(c.to_ascii_uppercase());
+            capitalize_next = false;
         } else {
-            if capitalize_next {
-                camel_case.push(c.to_ascii_uppercase());
-                capitalize_next = false;
-            } else {
-                camel_case.push(c);
-            }
+            camel_case.push(c);
         }
     }
 

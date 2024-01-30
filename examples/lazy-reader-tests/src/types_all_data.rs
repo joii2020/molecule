@@ -983,6 +983,7 @@ fn test_union() {
     test_union_item(TypesUnionA::Table0(TypesTable0::default()));
     test_union_item(TypesUnionA::Table6(TypesTable6::default()));
     test_union_item(TypesUnionA::Table6Opt(TypesOption::default()));
+    test_union_item(TypesUnionA::Table6Opt(TypesOption::new_none()));
 }
 
 #[test]
