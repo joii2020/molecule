@@ -68,6 +68,9 @@ impl DataSource {
         read_len: usize,
     ) -> Result<usize, Error> {
         // Read directly if the requested length is larger than maximum cache size
+        if read_len == 0 {
+            return Ok(0);
+        }
         if read_len > self.cache.len() {
             return self.reader.read(buf, offset);
         }
