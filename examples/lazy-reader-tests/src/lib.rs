@@ -134,18 +134,18 @@ impl From<molecule::lazy_reader::Error> for TypesCheckErr {
     fn from(value: molecule::lazy_reader::Error) -> Self {
         use molecule::lazy_reader::Error::*;
         match value {
-            Common(v) => Self::Mol2Err(format!("Common({})", v)),
-            TotalSize(v) => Self::Mol2Err(format!("TotalSize({})", v)),
-            Header(v) => Self::Mol2Err(format!("Header({})", v)),
-            Offset(v) => Self::Mol2Err(format!("Offset({})", v)),
-            UnknownItem(v) => Self::Mol2Err(format!("UnknownItem({})", v)),
-            OutOfBound(v) => Self::Mol2Err(format!("OutOfBound({})", v)),
-            FieldCount(v) => Self::Mol2Err(format!("FieldCount({})", v)),
-            Data(v) => Self::Mol2Err(format!("Data({})", v)),
-            Overflow(v) => Self::Mol2Err(format!("Overflow({})", v)),
-            Read(v) => Self::Mol2Err(format!("Read({})", v)),
-            Verify(v) => Self::Mol2Err(format!("Verify({})", v)),
-            Unknown(v) => Self::Mol2Err(format!("Unknown({})", v)),
+            Common => Self::Mol2Err(format!("Common({})", v)),
+            TotalSize(_, _) => Self::Mol2Err(format!("TotalSize({})", v)),
+            Header(_) => Self::Mol2Err(format!("Header({})", v)),
+            Offset(_) => Self::Mol2Err(format!("Offset({})", v)),
+            UnknownItem(_) => Self::Mol2Err(format!("UnknownItem({})", v)),
+            OutOfBound(_) => Self::Mol2Err(format!("OutOfBound({})", v)),
+            FieldCount(_) => Self::Mol2Err(format!("FieldCount({})", v)),
+            Data(_) => Self::Mol2Err(format!("Data({})", v)),
+            Overflow(_) => Self::Mol2Err(format!("Overflow({})", v)),
+            Read(_) => Self::Mol2Err(format!("Read({})", v)),
+            Verify(_) => Self::Mol2Err(format!("Verify({})", v)),
+            Unknown(_) => Self::Mol2Err(format!("Unknown({})", v)),
         }
     }
 }
