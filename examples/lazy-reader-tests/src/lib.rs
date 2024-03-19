@@ -134,18 +134,27 @@ impl From<molecule::lazy_reader::Error> for TypesCheckErr {
     fn from(value: molecule::lazy_reader::Error) -> Self {
         use molecule::lazy_reader::Error::*;
         match value {
-            Common => Self::Mol2Err(format!("Common({})", v)),
-            TotalSize(_, _) => Self::Mol2Err(format!("TotalSize({})", v)),
-            Header(_) => Self::Mol2Err(format!("Header({})", v)),
-            Offset(_) => Self::Mol2Err(format!("Offset({})", v)),
-            UnknownItem(_) => Self::Mol2Err(format!("UnknownItem({})", v)),
-            OutOfBound(_) => Self::Mol2Err(format!("OutOfBound({})", v)),
-            FieldCount(_) => Self::Mol2Err(format!("FieldCount({})", v)),
-            Data(_) => Self::Mol2Err(format!("Data({})", v)),
-            Overflow(_) => Self::Mol2Err(format!("Overflow({})", v)),
-            Read(_) => Self::Mol2Err(format!("Read({})", v)),
-            Verify(_) => Self::Mol2Err(format!("Verify({})", v)),
-            Unknown(_) => Self::Mol2Err(format!("Unknown({})", v)),
+            Common => Self::Mol2Err(format!("Common")),
+            TotalSize(s1, s2) => Self::Mol2Err(format!(
+                "TotalSize (validate: size({}) > total_size({}))",
+                s1, s2
+            )),
+            Header(s1, s2) => Self::Mol2Err(format!(
+                "Header(verify_fixed: self.size({}) != size({}))",
+                s1, s2
+            )),
+            Offset => Self::Mol2Err(format!("Offset")),
+            UnknownItem => Self::Mol2Err(format!("UnknownItem")),
+            OutOfBound(s1, s2) => Self::Mol2Err(format!("OutOfBound({}, {})", s1, s2)),
+            FieldCount(s) => Self::Mol2Err(format!("FieldCount({})", s)),
+            Data => Self::Mol2Err(format!("Data")),
+            Overflow => Self::Mol2Err(format!("Overflow")),
+            Read(s1, s2) => Self::Mol2Err(format!(
+                "Read(TryFrom<Cursor>: size({}) != buf.len()({}))",
+                s1, s2
+            )),
+            Verify => Self::Mol2Err(format!("Verify")),
+            Unknown => Self::Mol2Err(format!("Unknown")),
         }
     }
 }
